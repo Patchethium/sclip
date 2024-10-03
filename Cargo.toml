@@ -1,0 +1,16 @@
+[package]
+name = "sclip"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.38"
+clap = { version = "4.5.19", features = ["derive"] }
+colored = "2.1.0"
+
+[profile.release]
+strip = true
+opt-level = "z"  
+lte = true
+panic = "abort"
+codegen-units = 1
