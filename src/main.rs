@@ -4,24 +4,47 @@ use chrono;
 use clap::Parser;
 use colored::Colorize;
 use std::sync::{Arc, Mutex};
-use std::hash::{Hash, Hasher};
+
 #[derive(Parser, Debug)]
 struct Args {
     /// Time interval for checking clipboard content, in milliseconds
     #[arg(short, long)]
     time: Option<u64>,
-    // The selection to read from, primary or clipboard 
+    /// The selection to read from, primary or clipboard.
+    #[arg(short, long)]
+    selection: Option<Selection>,
+}
+
+// "primary", "secondary", "clipboard" or "buffer-cut"
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum Selection {
+    Primary,
+    Secondary,
+    Clipboard,
+    BufferCut,
+}
+
+impl ToString for Selection {
+    fn to_string(&self) -> String {
+        match self {
+            Selection::Primary => "primary".to_string(),
+            Selection::Secondary => "secondary".to_string(),
+            Selection::Clipboard => "clipboard".to_string(),
+            Selection::BufferCut => "buffer-cut".to_string(),
+        }
+    }
 }
 
 fn main() {
     let args = Args::parse();
     let time = args.time.unwrap_or(300);
+    let selection = args.selection.unwrap_or(Selection::Clipboard).to_string();
     let memory = Arc::new(Mutex::new(String::new()));
     loop {
         let output = std::process::Command::new("xclip")
             .arg("-o")
             .arg("-selection")
-            .arg("clipboard")
+            .arg(&selection)
             .output()
             .expect("failed to execute process");
         let output = String::from_utf8_lossy(&output.stdout);
@@ -42,8 +65,6 @@ fn main() {
                     .output()
                     .expect("failed to execute process");
             }
-        } else {
-            // do nothing
         }
         std::thread::sleep(std::time::Duration::from_millis(time));
     }
