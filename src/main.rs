@@ -50,6 +50,9 @@ fn main() {
 
     let mut memory = Box::new(String::new());
     let mut child: Option<Child> = None;
+
+    println!("{} Start listening to the clipboard, press {} to exit.", get_datetime().green(), "Ctrl+C".yellow());
+
     loop {
         let stdout = Command::new("xclip")
             .arg("-o")
@@ -75,20 +78,14 @@ fn main() {
                     child.kill().expect("failed to kill child");
                     println!(
                         "{} {}",
-                        chrono::Local::now()
-                            .format("%Y-%m-%d %H:%M:%S")
-                            .to_string()
-                            .green(),
+                        get_datetime().green(),
                         "Interrupted.".blue(),
                     );
                 }
             }
             println!(
                 "{} {} {}",
-                chrono::Local::now()
-                    .format("%Y-%m-%d %H:%M:%S")
-                    .to_string()
-                    .green(),
+                get_datetime().green(),
                 "Speaking:".yellow().bold(),
                 input
             );
@@ -101,4 +98,8 @@ fn main() {
         }
         thread::sleep(Duration::from_millis(time));
     }
+}
+
+fn get_datetime() -> String {
+    chrono::Local::now().format("%H:%M:%S").to_string()
 }
