@@ -17,7 +17,7 @@ struct Args {
     /// The selection of `xclip` to read from.
     #[arg(short, long, default_value = "clipboard")]
     selection: Selection,
-    /// If true, when the clipboard is not empty, whether to read it out immediately.
+    /// If true, when the clipboard is not empty, read it out immediately.
     #[arg(short, long, default_value = "false")]
     initial: bool,
 }
@@ -51,14 +51,19 @@ fn main() {
     let mut memory = Box::new(String::new());
     let mut child: Option<Child> = None;
 
-    println!("{} Start listening to the clipboard, press {} to exit.", get_datetime().green(), "Ctrl+C".yellow());
+    println!(
+        "{} Start listening to the clipboard, press {} to exit.",
+        get_datetime().green(),
+        "Ctrl+C".yellow()
+    );
 
     loop {
         let stdout = Command::new("xclip")
             .arg("-o")
             .args(&["-selection", selection.as_str()])
             .output()
-            .expect("failed to execute process xclip");
+            .expect("failed to execute process `xclip`");
+
         let input = String::from_utf8_lossy(&stdout.stdout)
             .to_string()
             .trim()
@@ -76,11 +81,7 @@ fn main() {
             if let Some(child) = &mut child {
                 if child.try_wait().unwrap().is_none() {
                     child.kill().expect("failed to kill child");
-                    println!(
-                        "{} {}",
-                        get_datetime().green(),
-                        "Interrupted.".blue(),
-                    );
+                    println!("{} {}", get_datetime().green(), "Interrupted.".blue(),);
                 }
             }
             println!(
@@ -93,7 +94,7 @@ fn main() {
                 Command::new("espeak")
                     .arg(&input)
                     .spawn()
-                    .expect("failed to execute process"),
+                    .expect("failed to execute process `espeak`"),
             );
         }
         thread::sleep(Duration::from_millis(time));
