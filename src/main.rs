@@ -1,18 +1,25 @@
-//! a small tool to read out the clipboard content
+//! a little tool to read out the clipboard content
 //! using `xclip -o` and `espeak`
+use std::process::{Child, Command};
+use std::thread;
+use std::time::Duration;
+
 use chrono;
-use clap::Parser;
 use colored::Colorize;
-use std::sync::{Arc, Mutex};
+
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Time interval for checking clipboard content, in milliseconds
-    #[arg(short, long)]
-    time: Option<u64>,
-    /// The selection to read from, primary or clipboard.
-    #[arg(short, long)]
-    selection: Option<Selection>,
+    /// Time interval for checking clipboard content in milliseconds.
+    #[arg(short, long, default_value = "300")]
+    time: u64,
+    /// The selection of `xclip` to read from.
+    #[arg(short, long, default_value = "clipboard")]
+    selection: Selection,
+    /// If true, when the clipboard is not empty, whether to read it out immediately.
+    #[arg(short, long, default_value = "false")]
+    initial: bool,
 }
 
 // "primary", "secondary", "clipboard" or "buffer-cut"
@@ -36,36 +43,62 @@ impl ToString for Selection {
 }
 
 fn main() {
-    let args = Args::parse();
-    let time = args.time.unwrap_or(300);
-    let selection = args.selection.unwrap_or(Selection::Clipboard).to_string();
-    let memory = Arc::new(Mutex::new(String::new()));
+    let args: Args = Args::parse();
+    let time = args.time;
+    let selection = args.selection.to_string();
+    let initial = args.initial;
+
+    let mut memory = Box::new(String::new());
+    let mut child: Option<Child> = None;
     loop {
-        let output = std::process::Command::new("xclip")
+        let stdout = Command::new("xclip")
             .arg("-o")
-            .arg("-selection")
-            .arg(&selection)
+            .args(&["-selection", selection.as_str()])
             .output()
-            .expect("failed to execute process");
-        let output = String::from_utf8_lossy(&output.stdout);
-        let mut memory = memory.lock().unwrap();
-        if output != *memory {
-            *memory = output.to_string();
-            let trimmed = output.trim();
-            let datetime = chrono::Local::now();
-            println!(
-                "{} {}",
-                datetime.format("%Y-%m-%d %H:%M:%S").to_string().purple(),
-                "Speaking".green()
-            );
-            if trimmed.len() > 0 {
-                println!("{}", trimmed);
-                std::process::Command::new("espeak")
-                    .arg(trimmed)
-                    .output()
-                    .expect("failed to execute process");
-            }
+            .expect("failed to execute process xclip");
+        let input = String::from_utf8_lossy(&stdout.stdout)
+            .to_string()
+            .trim()
+            .to_string();
+
+        // skip the first loop if the clipboard is not empty and initial is false
+        if !initial && !input.is_empty() && memory.len() == 0 {
+            *memory = input.clone();
+            thread::sleep(Duration::from_millis(time));
+            continue;
         }
-        std::thread::sleep(std::time::Duration::from_millis(time));
+
+        if input != *memory {
+            *memory = input.clone();
+            if let Some(child) = &mut child {
+                if child.try_wait().unwrap().is_none() {
+                    child.kill().expect("failed to kill child");
+                    println!(
+                        "{} {}",
+                        chrono::Local::now()
+                            .format("%Y-%m-%d %H:%M:%S")
+                            .to_string()
+                            .green(),
+                        "Interrupted.".blue(),
+                    );
+                }
+            }
+            println!(
+                "{} {} {}",
+                chrono::Local::now()
+                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_string()
+                    .green(),
+                "Speaking:".yellow().bold(),
+                input
+            );
+            child = Some(
+                Command::new("espeak")
+                    .arg(&input)
+                    .spawn()
+                    .expect("failed to execute process"),
+            );
+        }
+        thread::sleep(Duration::from_millis(time));
     }
 }

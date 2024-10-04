@@ -10,7 +10,7 @@ colored = "2.1.0"
 
 [profile.release]
 strip = true
-opt-level = "z"  
+opt-level = "z"
 lte = true
 panic = "abort"
 codegen-units = 1
